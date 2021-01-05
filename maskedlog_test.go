@@ -3,6 +3,7 @@ package maskedlog_test
 import (
 	"fmt"
 	"go-maskedlog"
+	"os"
 	"testing"
 )
 
@@ -49,6 +50,20 @@ func TestStringify(t *testing.T) {
 	}
 }
 
+// This is a coupld of DIRECT tests on the SafeString method
+// Usually it won't be called directly as is't part of SanitizeInterfaceValues()
+// but weird things can happen there so we're extra cautious here
+func TestSafeString(t *testing.T) {
+	t.Parallel()
+
+	want := "deadxxxf123"
+	got := maskedlog.SafeString("deadbeef123")
+
+	if want != got {
+		t.Errorf("SafeString() failed; want %q, got %q", want, got)
+	}
+}
+
 type sanitizeTest struct {
 	input    string
 	expected string
@@ -71,8 +86,8 @@ func TestSanitizeInterfaceValues(t *testing.T) {
 			expected: "dexxxxx-x2",
 		},
 		{
-			input:    "deadbeef123",
-			expected: "deadxxxf123",
+			input:    "deadbeef124",
+			expected: "deadxxxf124",
 		},
 		{
 			input:    "deadxxxx-xxxx-xxxx-xxxx-xxxxxxxx5678",
@@ -80,13 +95,14 @@ func TestSanitizeInterfaceValues(t *testing.T) {
 		},
 	}
 
-	// bad way to do things, but this should tide us over until we refactor and
-	// improve things further
-	// var origToken = vars.GenieToken
+	mlog := maskedlog.GetSingleton()
 
 	for _, test := range tests {
-		// update the GenieToken value
-		// vars.GenieToken = test.input
+		// start with a clean slate
+		mlog.Reset()
+
+		mlog.AddSensitiveValue(test.input)
+		fmt.Fprintf(os.Stderr, "%+v\n", mlog)
 
 		// prepare the values
 		var v []interface{}
@@ -94,7 +110,7 @@ func TestSanitizeInterfaceValues(t *testing.T) {
 		v = append(v, "SOMETHING ELSE: aValue")
 
 		// sanitize the value(s)
-		maskedlog.SanitizeInterfaceValues(v)
+		mlog.SanitizeInterfaceValues(v)
 
 		// stringify the values (for convenience)
 		result := maskedlog.Stringify(v)
@@ -107,7 +123,4 @@ func TestSanitizeInterfaceValues(t *testing.T) {
 			t.Errorf("stringify failed: got: '%v', want '%v' (%d)", result, want, len(test.input))
 		}
 	}
-
-	// reset the token
-	// vars.GenieToken = origToken
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -13,9 +14,45 @@ import (
 // MaskStrings is a convenience type for the list of sensitive values to hide away
 type MaskStrings []string
 
-var maskStrings = MaskStrings{}
+// MaskLog is a structure to hold "useful" state
+type MaskLog struct {
+	SensitiveStrings *MaskStrings
+	Opts             interface{}
+}
 
-func safeString(s string) string {
+var once sync.Once
+
+var (
+	maskStrings MaskStrings
+)
+
+// GetSingleton ...
+func GetSingleton() MaskLog {
+	// via: https://medium.com/golang-issue/how-singleton-pattern-works-with-golang-2fdd61cd5a7f
+	once.Do(func() { // <-- atomic, does not allow repeating
+		maskStrings = make(MaskStrings, 0) // <-- thread safe
+	})
+
+	ml := MaskLog{
+		SensitiveStrings: &maskStrings,
+		Opts:             nil,
+	}
+
+	return ml
+}
+
+// Reset ...
+func (ml *MaskLog) Reset() {
+	maskStrings = make(MaskStrings, 0)
+}
+
+// AddSensitiveValue adds a new token/password value to mask in any log output
+func (ml *MaskLog) AddSensitiveValue(s string) {
+	maskStrings = append(maskStrings, s)
+}
+
+// SafeString ...
+func SafeString(s string) string {
 	rs := []rune(s)
 	const replaceChar = 'x'
 	const preserveChar = '-'
@@ -40,15 +77,15 @@ func safeString(s string) string {
 }
 
 // SanitizeInterfaceValues will mask sensitive values in output
-func SanitizeInterfaceValues(z interface{}) {
+func (ml MaskLog) SanitizeInterfaceValues(z interface{}) {
 	for i := range z.([]interface{}) {
 		q := z.([]interface{})[i]
 
 		// only replace (in) strings
 		_, ok := q.(string)
 		if ok {
-			for _, ms := range maskStrings {
-				q = strings.ReplaceAll(q.(string), ms, safeString(ms))
+			for _, ms := range *ml.SensitiveStrings {
+				q = strings.ReplaceAll(q.(string), ms, SafeString(ms))
 			}
 			z.([]interface{})[i] = q
 		}
@@ -71,28 +108,29 @@ func setLogFormat() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 }
 
-func prepareMessage(v interface{}) string {
+// PrepareMessage ...
+func (ml MaskLog) PrepareMessage(v interface{}) string {
 	setLogFormat()
-	SanitizeInterfaceValues(v)
+	ml.SanitizeInterfaceValues(v)
 	msg := Stringify(v)
 	return msg
 }
 
 // LogWarn does, uhm, warnings?
-func LogWarn(v ...interface{}) {
-	log.Warn().Msg(prepareMessage(v))
+func (ml MaskLog) LogWarn(v ...interface{}) {
+	log.Warn().Msg(ml.PrepareMessage(v))
 }
 
 // LogVerbose does other things
-func LogVerbose(v ...interface{}) {
+func (ml MaskLog) LogVerbose(v ...interface{}) {
 	/*
 		if *vars.Verbose {
-			log.Trace().Msg(prepareMessage(v))
+			log.Trace().Msg(ml.SensitiveStrings.PrepareMessage(v))
 		}
 	*/
 }
 
 // LogFatal does cool things
-func LogFatal(v ...interface{}) {
-	log.Fatal().Msg(prepareMessage(v))
+func (ml MaskLog) LogFatal(v ...interface{}) {
+	log.Fatal().Msg(ml.PrepareMessage(v))
 }
