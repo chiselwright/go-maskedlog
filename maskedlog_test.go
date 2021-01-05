@@ -3,7 +3,7 @@ package maskedlog_test
 import (
 	"fmt"
 	"go-maskedlog"
-	"os"
+	"reflect"
 	"testing"
 )
 
@@ -11,6 +11,47 @@ func TestLogDebug(t *testing.T) {
 	t.Parallel()
 
 	// TODO work out how to test the output properly, or at all
+}
+
+func TestGetSingleton(t *testing.T) {
+	/* The Plan:
+	   - create a new object
+	   - ensure there are no know sensitive words
+	   - add a sensitive work
+	   - create a different new object
+	   - both objects should have the same list of sensitive words
+	*/
+
+	var log1, log2 maskedlog.MaskLog
+	var sens1, sens2 *maskedlog.MaskStrings
+
+	// if the singleton really works as planned, we might have values from other
+	// test runs in here
+	log1 = maskedlog.GetSingleton()
+
+	sens1 = log1.SensitiveStrings
+	if len(*sens1) > 0 {
+		t.Errorf("GetSingleton() failed: want length=0, got length=%+v", len(*sens1))
+	}
+
+	log1.AddSensitiveValue("First")
+	log2 = maskedlog.GetSingleton()
+
+	// get the list of strings, and deeply compare them
+	sens1 = log1.SensitiveStrings
+	sens2 = log2.SensitiveStrings
+	if !reflect.DeepEqual(sens1, sens2) {
+		t.Errorf("GetSingleton() failed: want %+v, got %+v", sens1, sens2)
+	}
+
+	// adding to log2 should do the same thing, in reverse .. we should still
+	// have the same in both
+	log2.AddSensitiveValue("Second")
+	sens1 = log1.SensitiveStrings
+	sens2 = log2.SensitiveStrings
+	if !reflect.DeepEqual(sens1, sens2) {
+		t.Errorf("GetSingleton() failed: want %+v, got %+v", sens1, sens2)
+	}
 }
 
 func TestStringify(t *testing.T) {
@@ -102,7 +143,6 @@ func TestSanitizeInterfaceValues(t *testing.T) {
 		mlog.Reset()
 
 		mlog.AddSensitiveValue(test.input)
-		fmt.Fprintf(os.Stderr, "%+v\n", mlog)
 
 		// prepare the values
 		var v []interface{}
