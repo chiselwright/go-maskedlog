@@ -2,9 +2,10 @@ package maskedlog_test
 
 import (
 	"fmt"
-	"go-maskedlog"
 	"reflect"
 	"testing"
+
+	"github.com/chiselwright/go-maskedlog"
 )
 
 func TestLogDebug(t *testing.T) {

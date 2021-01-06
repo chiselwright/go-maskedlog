@@ -1,4 +1,4 @@
-module go-maskedlog
+module github.com/chiselwright/go-maskedlog
 
 go 1.15
 
