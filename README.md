@@ -1,5 +1,7 @@
 # go-maskedlog
 
+![goversion](https://img.shields.io/github/go-mod/go-version/chiselwright/go-maskedlog) [![godoc](http://img.shields.io/badge/godoc-reference-blue.svg?style=flat)](https://godoc.org/github.com/chiselwright/go-maskedlog) [![Coverage](http://gocover.io/_badge/github.com/chiselwright/go-maskedlog)](http://gocover.io/github.com/chiselwright/go-maskedlog)
+
 A logger on built on top of [zerolog](https://github.com/rs/zerolog) that can
 mask sensitive values in the output.
 
